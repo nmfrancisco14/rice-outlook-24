@@ -1,0 +1,1829 @@
+---
+title: "Philippine Rice Industry  Outlook"
+subtitle: "Data stories describing the current situation of the Philippine Rice Industry"
+# format: revealjs
+format:
+  revealjs:
+    css: custom-styles.css
+    touch: true
+    controls: true
+    slide-number: true
+    transition: fade
+    chalkboard: 
+      buttons: false
+    logo: www/philricelogo2.png
+    footer: "PhilRice Data Analytics Center"
+execute: 
+  echo: false
+  warning: false
+  message: false
+  freeze: auto
+---
+
+<!-- ## Important contents -->
+
+```{r}
+#| label: data and lib
+#| echo: false
+#|
+library(tidyverse)
+library(DT)
+library(htmltools)
+library(plotly)
+library(shiny)
+library(htmlwidgets)
+library(geojson)
+library(geojsonio)
+library(geojsonsf)
+library(sf)
+library(leaflet)
+
+
+clean_location <-  function(variable){
+  case_match(
+    str_to_lower(str_squish(variable)),
+    c("region i","ilocos","region 1","ilocos region", "region i (ilocos region)","region 1 (ilocos region)") ~ "Region I (Ilocos Region)",
+    c("region ii","region 2","cagayan valley", "region ii (cagayan valley)","region 2 (cagayan valley)") ~ "Region II (Cagayan Valley)",
+    c("region iii","region 3","central luzon", "region iii (central luzon)","region 3 (central luzon)") ~ "Region III (Central Luzon)",
+    c("region iv-a","southern tagalog","region 4a","calabarzon", "region iv-a (calabarzon)","region 4-a (calabarzon)") ~ "Region IV-A (CALABARZON)",
+    c("region v","bicol","region 5","bicol region", "region v (bicol region)","region 5 (bicol region)" ) ~ "Region V (Bicol Region)",
+    c("region vi","region 6","western visayas", "region vi (western visayas)", "region 6 (western visayas)") ~ "Region VI (Western Visayas)",
+    c("region vii","region 7","central visayas", "region vii (central visayas)", "region 7 (central visayas)") ~ "Region VII (Central Visayas)",
+    c("region viii","region 8","eastern visayas", "region viii (eastern visayas)","region 8 (eastern visayas)") ~ "Region VIII (Eastern Visayas)",
+    c("region ix","region 9","zamboanga peninsula", "region ix (zamboanga peninsula)", "region 9 (zamboanga peninsula)") ~ "Region IX (Zamboanga Peninsula)",
+    c("region x","region 10","northern mindanao", "region x (northern mindanao)","region 10 (northern mindanao)") ~ "Region X (Northern Mindanao)",
+    c("region xi","region 11","davao region", "region xi (davao region)","region 11 (davao region)") ~ "Region XI (Davao Region)",
+    c("region xii","region 12","soccsksargen", "region xii (soccsksargen)","region 12 (soccsksargen)") ~ "Region XII (SOCCSKSARGEN)",
+    c("region xiii","region 13","caraga", "region xiii (caraga)","region 13 (caraga region)","REGION XIII (Caraga) ") ~ "Region XIII (Caraga)",
+    c("region iv-b","mimaropa", "region iv-b (mimaropa)","mimaropa region","region 4-b (mimaropa region)" ) ~ "MIMAROPA Region",
+    c("cordillera administrative region (car)", "car","cordillera administrative region") ~ "Cordillera Administrative Region (CAR)",
+    c("autonomous region in muslim mindanao (armm)","armm","barmm","bangsamoro autonomous region in muslim mindanao (barmm)", "bangsamoro autonomous region in muslim mindanao") ~ "Bangsamoro Autonomous Region in Muslim Mindanao (BARMM)",
+    c("city of davao","davao city")~"davao city",
+    c("cotabato (north cotabato)","north cotabato")~"north cotabato",
+    c("compostela valley","davao de oro","davao de oro (compostela valley)")~"davao de oro (compostela valley)",
+    c("western samar","samar","samar (western samar")~"samar (western samar)",
+    c("maguindanao (excluding cotabato city)") ~ "maguindanao",
+    c("basilan (excluding city of isabela)")~"basilan",
+    c("ncr")~"national capital region (ncr)",
+    c("agusan norte")~"agusan del norte",
+    c("agusan sur")~"agusan del sur",
+    c("davao norte")~"davao del norte",
+    c("davao sur")~"davao del sur",
+    c("lanao norte")~"lanao del norte",
+    c("lanao sur")~"lanao del sur",
+    c("mt. province")~"mountain province",
+    c("mindoro occidental") ~"occidental mindoro",
+    c("mindoro oriental") ~"oriental mindoro",
+    c("surigao norte")~"surigao del norte",
+    c("surigao sur")~"surigao del sur",
+    c("zamboanga norte")~"zamboanga del norte",
+    c("zamboanga sur")~"zamboanga del sur",
+    .default = str_to_lower(variable)
+  )
+}
+
+
+# sua_ensemb<- readRDS("ensemb_phl_dt2030.rds")
+
+
+# sua_target <- readRDS("sua_new5_dt_phl.rds")
+
+seedclass_area <-  readRDS("AreabySeedclass.RDS")
+
+area_cropestab <- readRDS("areacropestab.rds")
+
+nis_total <- read_csv("nis_total.csv") |>
+  pivot_longer(Dry1_Rice:Wet_tot,
+               names_to = c("seas","comm"),
+               names_sep ="_",
+               values_to = "val")
+
+
+# nis_df <-  readRDS("nis_df.rds")
+
+province_map <-  readRDS("provincemap.RDS")
+
+```
+
+<!-- ::: {.incremental .tiny-text} -->
+
+<!-- -   Updated Rice SUA and projections (2025-2030) -->
+
+<!--     -   *Source: SUA Dashboard* -->
+
+<!-- -   Rice Areas planted to inbred rice -->
+
+<!--     -   *Source: RBFHS 2021-2022/SCR PUF* 2022 -->
+
+<!--     -   [Ricelytics Seeds and Varieties Dashboard](https://ricelytics.philrice.gov.ph/seeds_and_varieties/) -->
+
+<!-- -   Rice Areas planted to Hybrid rice -->
+
+<!--     -   *Source: RBFHS 2021-2022/SCR PUF* 2022 -->
+
+<!-- -   Rice Areas practicing Direct Seeding -->
+
+<!--     -   *Source: RBFHS 2021-2022/SCR PUF* 2022 (in terms of man days) -->
+
+<!-- -   Rice Areas practicing double dry cropping -->
+
+<!--     -   Source: NIA data program area for double dry 2025 / NIS explorer map -->
+
+<!-- -   Outlook -->
+
+<!-- ::: -->
+
+# Historical trends
+
+## Production and Yield trends in the Philippines {.tiny-text}
+
+```{r}
+#| label: ann_prod
+#| echo: false
+#| warning: false
+#| message: false
+
+psadata <-  readRDS("psadata.rds")
+
+
+nat_annual<- 
+  psadata |> 
+  filter(PERIOD_CODE==3) |> 
+  filter(eco_code==1) |> 
+  filter(LOCATION_TYPE=="NATIONAL") |> 
+  select(LOCATION,eco_code,date,PRODUCTION:YIELD)
+
+
+
+prod_plot <- 
+plot_ly(nat_annual,
+        x = ~year(date), 
+        y = ~PRODUCTION,
+        marker = list(color = "darkgreen"),
+        name = "Total production (mt)",
+        type = 'bar',
+        width =1000,
+        height=600) |> 
+  layout(
+         xaxis = list(title = "Year",
+                      rangeslider = list(visible = TRUE)),
+         yaxis = list(title = "Production in MT"),
+         barmode = "overlay")
+
+
+
+prod_plot |> 
+    add_lines(y=~YIELD, x=~year(date),
+            name = "Average yield (mt/ha)",
+            data = nat_annual,
+            yaxis = 'y2',
+            line = list(color = "darkorange", width = 4),
+            marker = list(color= "orange")
+            ) |> 
+    layout(
+    title =  "National Annual Production (1971 - Present)",
+    yaxis = list(title = "Production (MT)"),
+    yaxis2 = list(
+      title = "Average yield (mt/ha)",
+      overlaying = "y",
+      side = "right",
+      titlefont = list(size = 12),
+      tickfont = list(size = 10),
+      standoff = 20  
+    ),
+    hovermode = 'x unified',
+    xaxis = list(title = "Year"),
+    legend = list(x = 0.05, y = 0.95),
+    margin = list(r = 80)
+    ) |> 
+    config(displayModeBar=FALSE)
+  
+```
+
+## Trends in sources of production growth/decline {.tiny-text}
+
+```{r}
+#| label: sopg
+#| echo: false
+
+
+sopg <-  read_csv("national_sopg.csv") |> 
+  mutate(across(c(ps_area,ps_yield),
+                ~(.*100))) |> 
+  mutate(ps_area2 = case_when(
+    prod_change_total>0 & ps_area<0 & ps_yield>0~0,
+    prod_change_total>0 & ps_yield<0 & ps_area>0 ~1,
+    prod_change_total<0 & ps_area>0 & ps_yield<0~0,
+    prod_change_total<0 & ps_yield>0 & ps_area<0 ~1,
+    .default = (ps_area/(ps_yield+ps_area))),
+    ps_yield2 = case_when(
+      prod_change_total>0 & ps_yield<0 & ps_area>0 ~0,
+      prod_change_total>0 & ps_area<0 & ps_yield>0 ~1,
+      prod_change_total<0 & ps_yield>0 & ps_area<0~0,
+      prod_change_total<0 & ps_area>0 & ps_yield<0 ~1,
+      .default = (ps_yield/(ps_yield+ps_area))
+    ),
+    prod_area_x = prod_change_total*ps_area2,
+    prod_yield_x=prod_change_total*ps_yield2,
+    area_perc = ps_area2*100,
+    yield_perc = ps_yield2*100
+  )
+
+
+plot_ly(x=~Year,
+        data = sopg |> filter(Year>2000),
+        width=1000,
+        height = 600) |> 
+  add_bars(
+    y = ~prod_area_x,
+    marker = list(color = "darkorange"),
+    name = "Production change due to area",
+    type = 'bar',
+    text = ~paste("% due to area:",round(area_perc), "%"),
+    textposition="none",
+    hoverinfo = 'text') |> 
+  add_bars(
+    y = ~prod_yield_x,
+    marker = list(color = "brown"),
+    name = "Production change due to yield",
+    type = 'bar',
+    text = ~paste("% due to yield:",round(yield_perc), "%"),
+    textposition="none",
+    hoverinfo = 'text') |>  
+    add_lines(
+    y = ~prod_change_total,
+    line = list(color = "darkgreen"),
+    marker = list(color = "darkgreen"),
+    text = ~paste("Production Change:",format(round(prod_change_total),big.mark=","), "MT"),
+    hoverinfo = 'text',
+    name = "Year-on-Year Change in Production") |>
+  layout(
+    
+    xaxis = list(title = "Year",
+                 rangeslider = list(visible = TRUE)),
+    yaxis = list(title = "Volume in MT"),
+    # hovermode = "x unified",
+    barmode = "stack",
+    legend = list(x = 0.05, y = 1,
+                  bgcolor = 'rgba(255, 255, 255, 0.4)'),
+    hovermode = 'x unified',
+    xaxis = list(title = "Year")
+  )|> 
+    config(displayModeBar=FALSE)
+  
+    
+  
+  
+
+```
+
+# 2024 Performance
+
+## Annual Production {.tiny-text}
+
+::: columns
+::: {.column width="30%"}
+```{r}
+#|label: prod_overall
+
+prod_natl <- 
+psadata |> 
+  filter(YEAR==2024) |> 
+  filter(LOCATION_TYPE=="NATIONAL") |> 
+  filter(PERIOD=="ANNUAL") |> 
+  mutate(PRODUCTION = round(PRODUCTION/1000000,digits = 2))
+
+prod_natl_alleco<- prod_natl |> 
+  filter(eco_code==1) |> 
+  pull(PRODUCTION)
+
+prod_natl_irr<- prod_natl |> 
+  filter(eco_code==2) |> 
+  pull(PRODUCTION)
+
+prod_natl_rain<- prod_natl |> 
+  filter(eco_code==3) |> 
+  pull(PRODUCTION)
+
+
+
+```
+
+::: flex-row
+::: {.value-box .blue}
+::: value-title
+All Ecosystem
+:::
+
+::: value-number
+`r prod_natl_alleco`
+:::
+
+::: value-subtitle
+Million MT
+:::
+:::
+
+::: {.value-box .green}
+::: value-title
+Irrigated
+:::
+
+::: value-number
+`r prod_natl_irr`
+:::
+
+::: value-subtitle
+Million MT
+:::
+:::
+
+::: {.value-box .orange}
+::: value-title
+Rainfed
+:::
+
+::: value-number
+`r prod_natl_rain`
+:::
+
+::: value-subtitle
+Million MT
+:::
+:::
+:::
+:::
+
+::: {.column width="70%"}
+```{r}
+#| label: prodmap2
+#| echo: false
+
+psa_prov2024 <- 
+psadata |> 
+  filter(YEAR==2024) |> 
+  filter(LOCATION_TYPE=="PROVINCE") |> 
+  filter(PERIOD=="ANNUAL") |> 
+  filter(eco_code==1) |> 
+  mutate(location2 = if_else(LOCATION == "COTABATO",
+                             "north cotabato",
+                             clean_location(LOCATION))
+  )
+
+psa_prodmap <- 
+province_map |>
+  left_join(psa_prov2024,
+            by=c("location"="location2"))
+
+
+
+prod_pal <- colorBin(palette =c("#FF7F00",
+                                "#FFD92F",
+                                "#4DAF4A",
+                                "#1F78B4"),
+                        na.color = "white",
+                        domain = psa_prodmap$PRODUCTION[psa_prodmap$PRODUCTION>0], 
+                        bins = c(0,51000,110000,310000,Inf))
+
+psa_prodmap <- 
+  psa_prodmap |> 
+  mutate(color = if_else(PRODUCTION==0, "grey",
+                         prod_pal(PRODUCTION)))
+
+labels_prod <- sprintf("Province: %s<br>Production: %0.2f", 
+                          str_to_title(psa_prodmap$location),
+                          psa_prodmap$PRODUCTION) %>%
+  lapply(htmltools::HTML)
+
+# Plot the map
+leaflet(psa_prodmap,
+        width = 700,
+        height = 600) %>%
+  addProviderTiles("CartoDB.VoyagerNoLabels",
+                   options = providerTileOptions(minZoom =5)) %>%
+  setView(lng = 121.7740+1, lat = 12.8797, zoom = 6) |> 
+  addPolygons(
+    fillColor =~color,
+    fillOpacity = 1,
+    weight = 1,
+    opacity = 1,
+    color = "black",
+    highlight = highlightOptions(weight = 3, color = "#666", fillOpacity = 0.7),
+    label = labels_prod
+  ) %>%
+    addLegend(pal = prod_pal, 
+              values = ~PRODUCTION, 
+              title = htmltools::HTML("Annual Palay Production in all ecosystems <br>by province"), 
+              
+              opacity = 0.7,
+              labFormat = function(type, cuts, p) {
+                c("<51,000", 
+                  "51,000 - 110,000", 
+                  "110,000 - 310,000", 
+                  "> 310.000")  # matches the bins
+              },
+              na.label = "No production") |> 
+    addControl(
+    html = "<div style='font-size: 12px;font-style: italic;'>Source:<br>PSA</div>",
+    position = "bottomleft"
+  )
+
+
+```
+:::
+:::
+
+## Average Yield {.tiny-text}
+
+::: columns
+::: {.column width="30%"}
+```{r}
+#|label: yld_overall
+
+yld_natl <- 
+psadata |> 
+  filter(YEAR==2024) |> 
+  filter(LOCATION_TYPE=="NATIONAL") |> 
+  filter(PERIOD=="ANNUAL") |> 
+  mutate(YIELD = round(YIELD,digits = 2))
+
+yld_natl_alleco<- yld_natl |> 
+  filter(eco_code==1) |> 
+  pull(YIELD)
+
+yld_natl_irr<- yld_natl |> 
+  filter(eco_code==2) |> 
+  pull(YIELD)
+
+yld_natl_rain<- yld_natl |> 
+  filter(eco_code==3) |> 
+  pull(YIELD)
+
+
+
+```
+
+::: flex-row
+::: {.value-box .blue}
+::: value-title
+All Ecosystem
+:::
+
+::: value-number
+`r yld_natl_alleco`
+:::
+
+::: value-subtitle
+metric tons per hectare
+:::
+:::
+
+::: {.value-box .green}
+::: value-title
+Irrigated
+:::
+
+::: value-number
+`r yld_natl_irr`
+:::
+
+::: value-subtitle
+metric tons per hectare
+:::
+:::
+
+::: {.value-box .orange}
+::: value-title
+Rainfed
+:::
+
+::: value-number
+`r yld_natl_rain`
+:::
+
+::: value-subtitle
+metric tons per hectare
+:::
+:::
+:::
+:::
+
+::: {.column width="70%"}
+```{r}
+#| echo: false
+
+
+yield_pal <- colorBin(palette =c("#F1A63C",
+                                "#FFF883",
+                                "#29883E",
+                                "#3B93E4",
+                                "#B07AA1"),
+                        na.color = "white",
+                        domain = psa_prodmap$YIELD[psa_prodmap$YIELD>0], 
+                        bins = c(0,3,4,5,6,Inf))
+
+psa_yldmap <- 
+  psa_prodmap |> 
+  mutate(color = if_else(YIELD==0, "grey",
+                         yield_pal(YIELD)))
+
+labels_yld <- sprintf("Province: %s<br>Average Yield: %0.2f", 
+                          str_to_title(psa_yldmap$YIELD),
+                          psa_yldmap$YIELD) %>%
+  lapply(htmltools::HTML)
+
+# Plot the map
+leaflet(psa_yldmap,
+        width = 700,
+        height = 600) %>%
+  addProviderTiles("CartoDB.VoyagerNoLabels",
+                   options = providerTileOptions(minZoom =5)) %>%
+  setView(lng = 121.7740+1, lat = 12.8797, zoom = 6) |> 
+  addPolygons(
+    fillColor =~color,
+    fillOpacity = 1,
+    weight = 1,
+    opacity = 1,
+    color = "black",
+    highlight = highlightOptions(weight = 3, color = "#666", fillOpacity = 0.7),
+    label = labels_yld
+  ) %>%
+    addLegend(pal = yield_pal, 
+              values = ~YIELD, 
+              title = htmltools::HTML("Annual Average Yield of Palay<br> in all ecosystems, by province"), 
+              
+              opacity = 0.7,
+              labFormat = function(type, cuts, p) {
+                c("<=3", 
+                  ">3 to 4", 
+                  ">4 to 5", 
+                  ">5 to 6",
+                  ">6")  # matches the bins
+              },
+              na.label = "No production") |> 
+    addControl(
+    html = "<div style='font-size: 12px;font-style: italic;'>Source:<br>PSA</div>",
+    position = "bottomleft"
+  )
+
+
+```
+:::
+:::
+
+# Seed Class Use and Crop Establishment
+
+## Seed Class Use (RBFHS 2022 DS) {.tiny-text}
+
+```{r}
+
+sclass_natl_ds <- 
+seedclass_area |> 
+  filter(location=="0-philippines") |> 
+  filter(data_season=="DS")
+
+
+sclass_nat_ds_hyb <- 
+  sclass_natl_ds |> 
+  pull(perce_hybrid_area) |> 
+  round(digits = 2)
+  
+sclass_nat_ds_hqs <- 
+  sclass_natl_ds |> 
+  pull(perce_highInbred_area) |> 
+  round(digits = 2)
+  
+sclass_nat_ds_lqs<- 
+  sclass_natl_ds |> 
+  pull(perce_lowInbred_area) |> 
+  round(digits = 2)
+
+
+sclass_natl_ws <- 
+seedclass_area |> 
+  filter(location=="0-philippines") |> 
+  filter(data_season=="WS")
+
+
+sclass_nat_ws_hyb <- 
+  sclass_natl_ws |> 
+  pull(perce_hybrid_area) |> 
+  round(digits = 2)
+  
+sclass_nat_ws_hqs <- 
+  sclass_natl_ws |> 
+  pull(perce_highInbred_area) |> 
+  round(digits = 2)
+  
+sclass_nat_ws_lqs<- 
+  sclass_natl_ws |> 
+  pull(perce_lowInbred_area) |> 
+  round(digits = 2)
+    
+
+```
+
+::: columns
+::: {.column width="30%"}
+::: flex-row
+::: {.value-box .blue}
+::: value-title
+Hybrid Seeds
+:::
+
+::: value-number
+`r sclass_nat_ds_hyb` %
+:::
+
+::: value-subtitle
+of total area planted
+:::
+:::
+
+::: {.value-box .green}
+::: value-title
+High Quality Inbred Seeds
+:::
+
+::: value-number
+`r sclass_nat_ds_hqs` %
+:::
+
+::: value-subtitle
+of total area planted
+:::
+:::
+
+::: {.value-box .orange}
+::: value-title
+Low Quality Inbred Seeds
+:::
+
+::: value-number
+`r sclass_nat_ds_lqs` %
+:::
+
+::: value-subtitle
+of total area planted
+:::
+:::
+:::
+:::
+
+::: {.column width="70%"}
+```{r}
+#| label: hqs_ds
+#| echo: false
+
+
+seedclass_map <- 
+province_map |> left_join(seedclass_area |> 
+                            filter(year==2022,
+                                   locType==2) |> 
+                            mutate(location = clean_location(location)) |> 
+                            select(location,totarea:perce_lowInbred_area)
+                          )
+
+
+bin_sclass <- quantile(seedclass_map$perce_highInbred_area, probs = seq(0, 1, length.out = 4), na.rm = TRUE, names = FALSE)
+
+
+pal_sclass <- colorBin(palette = c("#FFA87D",
+                                   "#E77561",
+                                   "#BC8B77",
+                                   "#BC5F3B"
+                                   ), 
+                       na.color = "white",
+                       domain = seedclass_map$perce_highInbred_area, 
+                       bins = c(0,25,50,75,100))
+
+seedclass_map <- 
+  seedclass_map |> 
+  mutate(color = if_else(perce_highInbred_area==0, "white",
+                         pal_sclass(perce_highInbred_area)))
+
+
+labels_sclass <- sprintf("Province: %s<br>Percent: %0.2f", str_to_title(seedclass_map$location), seedclass_map$perce_highInbred_area) %>%
+  lapply(htmltools::HTML)
+
+# Plot the map
+leaflet(seedclass_map,
+        width = 700,
+        height=600) %>%
+  addProviderTiles("CartoDB.VoyagerNoLabels",
+                   options = providerTileOptions(minZoom =5)) %>%
+  setView(lng = 121.7740+1, lat = 12.8797, zoom = 6) |> 
+  addPolygons(
+    fillColor = ~pal_sclass(perce_highInbred_area),
+    weight = 1,
+    opacity = 1,
+    color = "black",
+    dashArray = "3",
+    fillOpacity = 0.7,
+    highlight = highlightOptions(weight = 3, color = "#666", fillOpacity = 0.7),
+    label = labels_sclass
+  ) %>%
+    addLegend(pal = pal_sclass, 
+              values = ~perce_highInbred_area, 
+            title = htmltools::HTML("Percent rice area planted with <br>High Quality Inbred Seeds (2022 DS)"), 
+            opacity = 0.7,
+              labFormat = function(type, cuts, p) {
+    c("<25", "25-50", "50-75", "More than 75")  # matches the bins
+  },
+  na.label = "No adoption") |> 
+    addControl(
+    html = "<div style='font-size: 12px;font-style: italic;'>Source:<br>RBFHS 2021-2022 Survey</div>",
+    position = "bottomleft"
+  )
+
+```
+:::
+:::
+
+## Seed Class Use (RBFHS 2022 DS) {.tiny-text}
+
+::: columns
+::: {.column width="30%"}
+::: flex-row
+::: {.value-box .blue}
+::: value-title
+Hybrid Seeds
+:::
+
+::: value-number
+`r sclass_nat_ds_hyb` %
+:::
+
+::: value-subtitle
+of total area planted
+:::
+:::
+
+::: {.value-box .green}
+::: value-title
+High Quality Inbred Seeds
+:::
+
+::: value-number
+`r sclass_nat_ds_hqs` %
+:::
+
+::: value-subtitle
+of total area planted
+:::
+:::
+
+::: {.value-box .orange}
+::: value-title
+Low Quality Inbred Seeds
+:::
+
+::: value-number
+`r sclass_nat_ds_lqs` %
+:::
+
+::: value-subtitle
+of total area planted
+:::
+:::
+:::
+:::
+
+::: {.column width="70%"}
+```{r}
+#| echo: false
+
+
+bin_sclass2 <- quantile(seedclass_map$perce_hybrid_area, probs = seq(0, 1, length.out = 4), na.rm = TRUE, names = FALSE)
+
+
+pal_sclass2 <- colorBin(palette =c("#00F4FF",
+                                   "#00C5E9",
+                                   "#004CFF",
+                                   "#56A3F2"),
+                        na.color = "white",
+                        domain = seedclass_map$perce_hybrid_area[seedclass_map$perce_hybrid_area>0], 
+                        bins = c(0,25,50,75,100))
+
+seedclass_map2 <- 
+  seedclass_map |> 
+  mutate(color = if_else(perce_hybrid_area==0, "white",
+                         pal_sclass2(perce_hybrid_area)))
+
+labels_sclass2 <- sprintf("Province: %s<br>Percent: %0.2f", 
+                          str_to_title(seedclass_map2$location),
+                          seedclass_map2$perce_hybrid_area) %>%
+  lapply(htmltools::HTML)
+
+# Plot the map
+leaflet(seedclass_map2,
+        width=700,
+        height=600) %>%
+  addProviderTiles("CartoDB.VoyagerNoLabels",
+                   options = providerTileOptions(minZoom =5)) %>%
+  setView(lng = 121.7740+1, lat = 12.8797, zoom = 6) |> 
+  addPolygons(
+    fillColor =~color,
+    weight = 1,
+    opacity = 1,
+    color = "black",
+    dashArray = "3",
+    fillOpacity = 0.7,
+    highlight = highlightOptions(weight = 3, color = "#666", fillOpacity = 0.7),
+    label = labels_sclass2
+  ) %>%
+    addLegend(pal = pal_sclass2, 
+              values = ~perce_hybrid_area, 
+              title = htmltools::HTML("Percent rice area planted with<br> Hybrid Seeds (2022 DS)"), 
+              opacity = 0.7,
+              labFormat = function(type, cuts, p) {
+                c("<25", "25-50", "50-75", "More than 75")  # matches the bins
+              },
+              na.label = "No adoption") |> 
+    addControl(
+    html = "<div style='font-size: 12px;font-style: italic;'>Source:<br>RBFHS 2021-2022 Survey</div>",
+    position = "bottomleft"
+  )
+
+```
+:::
+:::
+
+## Seed Class Use (RBFHS 2021 WS) {.tiny-text}
+
+::: columns
+::: {.column width="30%"}
+::: flex-row
+::: {.value-box .blue}
+::: value-title
+Hybrid Seeds
+:::
+
+::: value-number
+`r sclass_nat_ws_hyb` %
+:::
+
+::: value-subtitle
+of total area planted
+:::
+:::
+
+::: {.value-box .green}
+::: value-title
+High Quality Inbred Seeds
+:::
+
+::: value-number
+`r sclass_nat_ws_hqs` %
+:::
+
+::: value-subtitle
+of total area planted
+:::
+:::
+
+::: {.value-box .orange}
+::: value-title
+Low Quality Inbred Seeds
+:::
+
+::: value-number
+`r sclass_nat_ws_lqs` %
+:::
+
+::: value-subtitle
+of total area planted
+:::
+:::
+:::
+:::
+
+::: {.column width="70%"}
+```{r}
+#| label: hqs_ws
+#| echo: false
+
+seedclass_map_ws <- 
+province_map |> left_join(seedclass_area |> 
+                            filter(year==2021,
+                                   locType==2) |> 
+                            mutate(location = clean_location(location)) |> 
+                            select(location,totarea:perce_lowInbred_area)
+                          )
+
+
+pal_sclass_ws <- colorBin(palette = c("#FFA87D",
+                                      "#E77561",
+                                      "#BC8B77",
+                                      "#BC5F3B"), 
+                          na.color = "white",
+                          domain = seedclass_map_ws$perce_highInbred_area, 
+                          bins = c(0,25,50,75,100))
+
+
+
+
+
+seedclass_map_ws <- 
+  seedclass_map_ws |> 
+  mutate(color = if_else(perce_highInbred_area==0, "white",
+                         pal_sclass_ws(perce_highInbred_area)))
+
+
+labels_sclass_ws <- sprintf("Province: %s<br>Percent: %0.2f", str_to_title(seedclass_map_ws$location), seedclass_map_ws$perce_highInbred_area) %>%
+  lapply(htmltools::HTML)
+
+# Plot the map
+leaflet(seedclass_map_ws,
+        width=700,
+        height=600) %>%
+  addProviderTiles("CartoDB.VoyagerNoLabels",
+                   options = providerTileOptions(minZoom =6)) %>%
+  setView(lng = 121.7740+1, lat = 12.8797, zoom = 6) |> 
+  addPolygons(
+    fillColor = ~pal_sclass_ws(perce_highInbred_area),
+    weight = 1,
+    opacity = 1,
+    color = "black",
+    dashArray = "3",
+    fillOpacity = 0.7,
+    highlight = highlightOptions(weight = 3, color = "#666", fillOpacity = 0.7),
+    label = labels_sclass
+  ) %>%
+    addLegend(pal = pal_sclass_ws, 
+              values = ~perce_highInbred_area, 
+            title = htmltools::HTML("Percent rice area planted with<br>High Quality Inbred Seeds (2021 WS)"), 
+            opacity = 0.7,
+              labFormat = function(type, cuts, p) {
+    c("<25", "25-50", "50-75", "More than 75")  # matches the bins
+  },
+  na.label = "No adoption") |> 
+      addControl(
+    html = "<div style='font-size: 12px;font-style: italic;'>Source:<br>RBFHS 2021-2022</div>",
+    position = "bottomleft"
+  )
+```
+:::
+:::
+
+## Seed Class Use (RBFHS 2021 WS) {.tiny-text}
+
+::: columns
+::: {.column width="30%"}
+::: flex-row
+::: {.value-box .blue}
+::: value-title
+Hybrid Seeds
+:::
+
+::: value-number
+`r sclass_nat_ws_hyb` %
+:::
+
+::: value-subtitle
+of total area planted
+:::
+:::
+
+::: {.value-box .green}
+::: value-title
+High Quality Inbred Seeds
+:::
+
+::: value-number
+`r sclass_nat_ws_hqs` %
+:::
+
+::: value-subtitle
+of total area planted
+:::
+:::
+
+::: {.value-box .orange}
+::: value-title
+Low Quality Inbred Seeds
+:::
+
+::: value-number
+`r sclass_nat_ws_lqs` %
+:::
+
+::: value-subtitle
+of total area planted
+:::
+:::
+:::
+:::
+
+::: {.column width="70%"}
+```{r}
+#| echo: false
+
+
+
+pal_sclass2WS <- colorBin(palette =c("#00F4FF",
+                                   "#00C5E9",
+                                   "#004CFF",
+                                   "#56A3F2"),
+                        na.color = "white",
+                        domain = seedclass_map_ws$perce_hybrid_area[seedclass_map_ws$perce_hybrid_area>0], 
+                        bins = c(0,25,50,75,100))
+
+seedclass_map2_WS <- 
+  seedclass_map_ws |> 
+  mutate(color = if_else(perce_hybrid_area==0, "white",
+                         pal_sclass2WS(perce_hybrid_area)))
+
+labels_sclass2WS <- sprintf("Province: %s<br>Percent: %0.2f", 
+                          str_to_title(seedclass_map2_WS$location),
+                          seedclass_map2_WS$perce_hybrid_area) %>%
+  lapply(htmltools::HTML)
+
+# Plot the map
+leaflet(seedclass_map2_WS,
+        width=700,
+        height = 600) %>%
+  addProviderTiles("CartoDB.VoyagerNoLabels",
+                   options = providerTileOptions(minZoom =6)) %>%
+  setView(lng = 121.7740+1, lat = 12.8797, zoom = 6) |> 
+  addPolygons(
+    fillColor =~color,
+    weight = 1,
+    opacity = 1,
+    color = "black",
+    dashArray = "3",
+    fillOpacity = 0.7,
+    highlight = highlightOptions(weight = 3, color = "#666", fillOpacity = 0.7),
+    label = labels_sclass2WS
+  ) %>%
+    addLegend(pal = pal_sclass2WS, 
+              values = ~perce_hybrid_area, 
+              title = htmltools::HTML("Percent rice area planted with<br>Hybrid Seeds (2021 WS)"), 
+              opacity = 0.7,
+              labFormat = function(type, cuts, p) {
+                c("<25", "25-50", "50-75", "More than 75")  # matches the bins
+              },
+              na.label = "No adoption") |> 
+      addControl(
+    html = "<div style='font-size: 12px;font-style: italic;'>Source:<br>RBFHS 2021-2022</div>",
+    position = "bottomleft"
+  )
+```
+:::
+:::
+
+## Area % planted to Direct Seeding (RBFHS 2022 DS) {.tiny-text}
+
+```{r}
+#|echo: false
+
+are_dseed <- 
+area_cropestab |>
+  filter(location=="0-philippines")
+
+area_dseed_DS <-   
+are_dseed |>
+  filter(data_season=="DS") |> 
+  pull(perce_direct) |> 
+  round(digits=2)
+
+area_dssed_WS <- 
+are_dseed |>
+  filter(data_season=="WS") |> 
+  pull(perce_direct) |> 
+  round(digits=2)
+  
+
+
+```
+
+::: columns
+::: {.column width="30%"}
+::: flex-row
+::: {.value-box .blue}
+::: value-number
+`r area_dseed_DS` %
+:::
+
+::: value-title
+Area planted with Direct Seeding
+:::
+:::
+:::
+:::
+
+::: {.column width="70%"}
+```{r}
+#|echo: false
+#|fig-height: 12
+
+cropestab_map <- 
+province_map |> left_join(area_cropestab |> 
+                            filter(year==2022,
+                                   locType==2) |> 
+                            mutate(location = clean_location(location)) |> 
+                            select(location,totalarea:perce_direct)
+                          )
+
+
+bins <- quantile(cropestab_map$direct, probs = seq(0, 1, length.out = 5), na.rm = TRUE, names = FALSE)
+
+pal <- colorBin(palette =c("#00F4FF",
+                            "#00C5E9",
+                            "#004CFF",
+                            "#56A3F2"
+                            ),
+                 na.color = "white",
+                 domain = cropestab_map$perce_direct[cropestab_map$perce_direct>0], 
+                 bins = c(0,25,50,75,100))
+
+# pal <- colorBin(palette = "BuGn", domain = cropestab_map$direct, bins = c(0,1,10,25,50,100,Inf))
+
+labels <- sprintf("Province: %s<br>Percent: %0.2f", str_to_title(cropestab_map$location), cropestab_map$perce_direct) %>%
+  lapply(htmltools::HTML)
+
+cropestab_map <- 
+  cropestab_map |> 
+  mutate(color = if_else(perce_direct==0, "white", pal(perce_direct)))
+
+# Plot the map
+leaflet(cropestab_map,
+        width=700,
+        height = 600) %>%
+  addProviderTiles("CartoDB.VoyagerNoLabels",
+                   options = providerTileOptions(minZoom =5)) %>%
+  setView(lng = 121.7740+1, lat = 12.8797, zoom = 6) |> 
+  addPolygons(
+    fillColor = ~color,
+    weight = 1,
+    opacity = 1,
+    color = "black",
+    dashArray = "3",
+    fillOpacity = 0.7,
+    highlight = highlightOptions(weight = 3, color = "#666", fillOpacity = 0.7),
+    label = labels
+  ) %>%
+  addLegend(pal = pal, values = ~perce_direct, 
+            title = htmltools::HTML("Rice area planted with <br>direct seeding method (2022 DS)"), 
+            opacity = 0.7,
+              labFormat = function(type, cuts, p) {
+    c("<25", "25-50", "50-75", "More than 75")  # matches the bins
+  },
+  na.label = "No adoption") |> 
+      addControl(
+    html = "<div style='font-size: 12px;font-style: italic;'>Source:<br>RBFHS 2021-2022</div>",
+    position = "bottomleft"
+  )
+```
+:::
+:::
+
+## Area % planted to Direct Seeding (RBFHS 2021 WS) {.tiny-text}
+
+::: columns
+::: {.column width="30%"}
+::: flex-row
+::: {.value-box .blue}
+::: value-number
+`r area_dssed_WS` %
+:::
+
+::: value-title
+Area planted with Direct Seeding
+:::
+:::
+:::
+:::
+
+::: {.column width="70%"}
+```{r}
+#|echo: false
+#|fig-height: 12
+
+cropestab_map2 <- 
+province_map |> left_join(area_cropestab |> 
+                            filter(year==2021,
+                                   locType==2) |> 
+                            mutate(location = clean_location(location)) |> 
+                            select(location,totalarea:perce_direct)
+                          )
+
+
+bins2 <- quantile(cropestab_map2$perce_direct, probs = seq(0, 1, length.out = 5), na.rm = TRUE, names = FALSE)
+pal2 <- colorBin(palette =c("#00F4FF",
+                            "#00C5E9",
+                            "#004CFF",
+                            "#56A3F2"
+                            ),
+                 na.color = "white",
+                 domain = cropestab_map2$perce_direct[cropestab_map2$perce_direct>0], 
+                 bins = c(0,25,50,75,100))
+
+labels <- sprintf("Province: %s<br>Percent: %0.2f", str_to_title(cropestab_map2$location), cropestab_map2$perce_direct) %>%
+  lapply(htmltools::HTML)
+
+
+cropestab_map2 <- 
+  cropestab_map2 |> 
+  mutate(color = if_else(perce_direct==0, "white", pal2(perce_direct)))
+
+# Plot the map
+leaflet(cropestab_map2,
+        width = 700,
+        height = 600) %>%
+  addProviderTiles("CartoDB.VoyagerNoLabels",
+                   options = providerTileOptions(minZoom =5)) %>%
+   setView(lng = 121.7740+1, lat = 12.8797, zoom = 6) |> 
+  addPolygons(
+    fillColor = ~color,
+    weight = 1,
+    opacity = 1,
+    color = "black",
+    dashArray = "3",
+    fillOpacity = 0.7,
+    highlight = highlightOptions(weight = 3, color = "#666", fillOpacity = 0.7),
+    label = labels
+  ) %>%
+  addLegend(pal = pal, values = ~perce_direct, 
+            title = htmltools::HTML("Rice area planted with <br>direct seeding method (2021 WS)"), 
+            opacity = 0.7,
+              labFormat = function(type, cuts, p) {
+    c("<25", "25-50", "50-75", "More than 75")  # matches the bins
+  },
+  na.label = "No adoption") |> 
+      addControl(
+    html = "<div style='font-size: 12px;font-style: italic;'>Source:<br>RBFHS 2021-2022</div>",
+    position = "bottomleft"
+  )
+```
+:::
+:::
+
+# Rice Market
+
+## Quarterly Farmgate Prices (Dry), 2010-2024 {.tiny-text}
+
+```{r}
+#| echo: false
+library(openxlsx)
+library(tidyverse)
+
+
+riceprices <-  readRDS("riceprices.rds")
+
+
+xriceprice <- 
+  riceprices |> 
+  filter(SERIES %in% c("New Series","2012-based","2018-based")) |> 
+  filter(str_detect(COMMODITY,"WMR|RMR|Palay")) |> 
+  filter(LOCATION=="PHILIPPINES") |> 
+  mutate(date = ymd(paste(YEAR,PERIOD,"1",sep="-")),
+         yr = year(date),
+         mth = month(date),
+         qtr = quarter(date),
+         sem = semester(date))
+
+xriceprice_QTR <- 
+xriceprice |> 
+  group_by(yr,qtr,TYPE,COMMODITY) |> 
+  summarise_at(vars(PRICE),
+               list(mean=mean,min=min,max=max)) |> 
+  ungroup() |> 
+  mutate(quarterdate = ymd(paste(yr,qtr*3,1,sep="-")),
+         quartertext = paste(yr,"Quarter",qtr))
+```
+
+```{r}
+#| label: farmgate
+#| echo: false
+#| 
+plot_ly(x=~quarterdate,
+        data = xriceprice_QTR |> 
+          filter(str_detect(COMMODITY,"Palay \\(Other")),
+        width=1000,
+        height = 600) |> 
+  add_lines(
+    y = ~max,
+    line = list(color = "transparent"),
+    hoverinfo = 'none',
+    showlegend = FALSE,
+    name = "Highest Price") |>
+  add_lines(
+    y = ~min,
+    line = list(color = "transparent"),
+    fill = 'tonexty', fillcolor='rgba(0,100,80,0.2)',
+    hoverinfo = 'none',
+    showlegend = FALSE,
+    name = "Lowest Price") |>
+
+  add_trace(
+    y = ~mean,
+    type = 'scatter', mode = 'lines+markers',
+    line = list(color = "darkgreen"),
+    marker = list(color = "darkgreen"),
+    text = ~paste("<b>",quartertext,"</b>",
+                  "<br>Average: ₱",format(round(mean,digits = 2),big.mark=","),
+                  "<br>Highest: ₱",round(max,digits=2),
+                  "<br>Lowest: ₱", round(min,digits=2)),
+    hoverinfo = 'text',
+    name = "Average Farmgate Price (Dry)") |>
+  layout(
+    title = "Average, Highest and Lowest Farmgate  Prices (Dry), by Quarter",
+    xaxis = list(title = "Year and Quarter",
+                 rangeslider = list(visible = TRUE)),
+    yaxis = list(title = "Pesos per kg (₱)"),
+    hovermode = "x unified",
+    # barmode = "stack",
+    legend = list(x = 0.05, y = 1,
+                  bgcolor = 'rgba(255, 255, 255, 0.4)')
+    # hovermode = 'x unified'
+  )|> 
+    config(displayModeBar=FALSE)
+
+
+```
+
+## Quarterly Wholesale and Retail Rice Prices, 2010-2024 {.tiny-text}
+
+```{r}
+#| label: riceprice
+#| echo: false
+
+plot_ly(x=~quarterdate,
+        width=1000,
+        height = 600,
+        data=xriceprice_QTR) |> 
+  add_trace(data =xriceprice_QTR |> 
+              filter(str_detect(TYPE,"Wholesale")) |> 
+              filter(str_detect(COMMODITY,"WMR")) |> 
+              filter(yr>=2012),
+            x=~quarterdate,
+            y=~mean,
+            type = 'scatter',
+            mode = 'lines',
+            text = ~paste("<b>",quartertext,"</b>",
+                          "<br> Wholesale - WMR: ₱", round(mean,digits=2)),
+            hoverinfo='text',
+            line = list(color ='darkgreen'),
+            name = "Well Milled Rice (wholesale)") |> 
+#Wholesale RTR
+  add_trace(data =xriceprice_QTR |> 
+              filter(str_detect(TYPE,"Retail")) |> 
+              filter(str_detect(COMMODITY,"WMR")),
+            x=~quarterdate,
+        y=~mean,
+        type = 'scatter',
+        mode = 'lines',
+        text = ~paste("Retail - WMR: ₱", round(mean,digits=2)),
+        hoverinfo='text',
+        line = list(color ='darkgreen',
+                    dash = "dash"),
+        name = "Well Milled Rice (retail)") |> 
+  add_lines(
+    data =xriceprice_QTR |> 
+      filter(str_detect(TYPE,"Wholesale")) |> 
+      filter(str_detect(COMMODITY,"RMR")) |> 
+      filter(yr>=2012),
+    y = ~mean,
+    text = ~paste("Wholesale - RMR: ₱",round(mean,digits=2)),
+    hoverinfo='text',
+    line = list(color = "darkorange"),
+    name = "Regular Milled Rice (wholesale)") |>
+      add_lines(
+    data =xriceprice_QTR |> 
+      filter(str_detect(TYPE,"Retail")) |> 
+      filter(str_detect(COMMODITY,"RMR")),
+    y = ~mean,
+    text = ~paste("Retail - RMR: ₱",round(mean,digits=2)),
+    hoverinfo='text',
+    line = list(color = "darkorange",
+                dash = "dash"),
+    name = "Regular Milled Rice (retail)") |>
+  layout(
+    title = "Average Wholesale and Retail Rice  Prices, by Quarter",
+    xaxis = list(title = "Year and Quarter",
+                 rangeslider = list(visible = TRUE)),
+    yaxis = list(title = "Pesos per kg (₱)"),
+    hovermode = "x unified",
+    # barmode = "stack",
+    legend = list(x = 0.05, y = 1,
+                  bgcolor = 'rgba(255, 255, 255, 0.4)')
+    # hovermode = 'x unified'
+  )|> 
+    config(displayModeBar=FALSE)
+
+
+```
+
+# Outlook for 2025 and beyond
+
+## 2025 Areas with double dry
+
+```{r}
+#| label: doubleDry
+
+bardata <- 
+    nis_total |> 
+    # filter(Category=="Total") |> 
+    filter(comm=="Rice") |> 
+    mutate(seas = recode_factor(seas,
+                                "Dry1"="AUG to NOV<br> <i>(1st Dry)",
+                                "Dry2"="DEC to MAR<br> <i> (2nd Dry)",
+                                "Ddry"="<b>Double Dry",
+                                "Wet"="APR to JUL<br> <i> (Regular Wet)",
+                                .ordered = T)
+           )
+
+seas_order <- levels(bardata$seas)
+#split
+
+bardata_ddry <- 
+  bardata |> filter(seas == "<b>Double Dry")
+
+bardata_xddry <- 
+  bardata |> filter(seas!= "<b>Double Dry")
+
+
+plot_ly(width = 1000, height = 600) %>%
+  # Other seasons: opacity 0.6
+  add_trace(
+    data = bardata_xddry,
+    x = ~val,
+    y = ~rev(seas),
+    type = 'bar',
+    orientation = 'h',
+    color = ~Category,
+    colors = c("#A0522D", "#B68B00", "darkgreen"),
+    opacity = 0.4,
+    text = ~paste(format(round(val), big.mark = ","), "HA"),
+    textposition = 'inside',
+    insidetextanchor = 'middle',
+    hoverinfo = 'none',
+    textfont = list(color = 'white', size = 15),
+    showlegend = TRUE
+  ) %>%
+  # Ddry: full opacity
+  add_trace(
+    data = bardata_ddry,
+    x = ~val,
+    y = ~rev(seas),
+    type = 'bar',
+    orientation = 'h',
+    color = ~Category,
+    colors = c("#A0522D", "#B68B00", "darkgreen"),
+    opacity = 1,
+    text = ~paste(format(round(val), big.mark = ","), "HA"),
+    textposition = 'inside',
+    insidetextanchor = 'middle',
+    hoverinfo = 'none',
+    textfont = list(color = 'white', size = 15),
+    showlegend = FALSE  # prevent double legend for same categories
+  ) %>%
+  layout(
+    title = 'Total NIS and CIS program area for rice, by season, CY 2025',
+    yaxis = list(
+      title = "",
+      categoryorder = "array",
+      categoryarray = rev(seas_order)
+    ),
+    xaxis = list(
+      title = "Program area (HA)"
+    )
+  ) %>%
+  config(displayModeBar = 0)
+
+
+
+# plot_ly(
+#   data=nis_total |> 
+#     # filter(Category=="Total") |> 
+#     filter(comm=="Rice") |> 
+#     mutate(seas = recode_factor(seas,
+#                                 "Dry1"="AUG to NOV<br> <i>(1st Dry)",
+#                                 "Dry2"="DEC to MAR<br> <i> (2nd Dry)",
+#                                 "Ddry"="<b>Double Dry",
+#                                 "Wet"="APR to JUL<br> <i> (Regular Wet)",
+#                                 .ordered = T)
+#            ),
+#   width=1000,
+#   height=600,
+#   x=~val,
+#   y=~rev(seas),
+#   color = ~Category, #"#F0C419"
+#   colors =  c("#A0522D", "#B68B00","darkgreen"),
+#   # colors = c("#6E3B1A","#B68B00","#2E6B13"),
+# 
+#   # marker = list(color = "darkgreen"),
+#   type = 'bar',
+#   orientation = 'h',
+#   text = ~paste(format(round(val), big.mark=","), "HA"),                      # Add value as text
+#   textposition = 'inside',         # Position text inside the bar
+#   insidetextanchor = 'middle',  
+#   hoverinfo = 'none',
+#   # Align text at the start of the bar
+#   textfont = list(color = 'white', size = 15)) |> # Optional: style the text) |> 
+#   layout(title = 'Total NIS and CIS program area for rice, by season, CY 2025',
+#          yaxis = list(
+#            title = "",
+#            categoryorder = "array",
+#            categoryarray = unique(nis_total$seas)
+#          ),
+#          xaxis = list(
+#            title = "Program area (HA)"
+#          )
+#   ) |> 
+#   config(displayModeBar=0)
+#   
+
+
+```
+
+<!-- ## SUA projections {.tiny-text} -->
+
+<!-- ::: tiny-text -->
+
+<!-- ```{r} -->
+
+<!-- #| label: sua projected -->
+
+<!-- #| echo: false -->
+
+<!-- ensemb_form <- readRDS("esembform.rds") -->
+
+<!-- sua_ensemb<-  -->
+
+<!-- ensemb_form[[".supply"]] %>% -->
+
+<!--   filter(!(variables %in% c("Base Palay Production", -->
+
+<!--                             "Total Calamity loss"))) %>%  -->
+
+<!--   rbind(ensemb_form[[".imports"]]) %>%  -->
+
+<!--   mutate(group ="SUPPLY") %>%  -->
+
+<!--   rbind(ensemb_form[[".demand"]] %>%  -->
+
+<!--           mutate(group ="DEMAND")) %>%  -->
+
+<!--   rbind(ensemb_form[[".ssr"]] %>%  -->
+
+<!--           mutate(group = " ")) |>  -->
+
+<!--   datatable(rownames = FALSE, -->
+
+<!--             options = list(pageLength = 20, -->
+
+<!--                            ordering=FALSE, -->
+
+<!--                            dom='t',  -->
+
+<!--                            # scrollX = TRUE, -->
+
+<!--                            # buttons = c('copy', 'csv', 'excel', 'pdf', 'print'), -->
+
+<!--                            # rowGroup = list(dataSrc = 7), -->
+
+<!--                            columnDefs = list( -->
+
+<!--                              list(visible = FALSE, targets=8) -->
+
+<!--                              # list(targets=2:9, class="dt-right") -->
+
+<!--                            ) -->
+
+<!--             ), -->
+
+<!--             class = "compact nowrap stripe hover" -->
+
+<!--   ) %>%  -->
+
+<!--   formatStyle(3:9, -->
+
+<!--               `text-align` = "right") %>%  -->
+
+<!--   formatCurrency(3:9, -->
+
+<!--                  digits = 0, -->
+
+<!--                  currency ="", -->
+
+<!--                  interval=3, -->
+
+<!--                  rows = 9:18, -->
+
+<!--                  mark=",") -->
+
+<!-- sua_ensemb -->
+
+<!-- ``` -->
+
+<!-- -   SUA projections 2025 - 2030 based on DAC Ensemble models -->
+
+<!-- ::: -->
+
+## SUA Target 2025-2030 {.tiny-text}
+
+::: tiny-text
+```{r}
+#| label: sua_target
+#| echo: false
+
+
+sua_new5_form <-  readRDS("sua_new5_form.rds")
+sua_target <- 
+  sua_new5_form[[".supply"]] %>%
+  filter(!(variables %in% c("Base Palay Production",
+                            "Total Calamity loss"))) %>% 
+  rbind(sua_new5_form[[".imports"]]) %>% 
+  mutate(group ="SUPPLY") %>% 
+  rbind(sua_new5_form[[".demand"]] %>% 
+          mutate(group ="DEMAND")) %>% 
+  rbind(sua_new5_form[[".ssr"]] %>% 
+          mutate(group = " ")) |> 
+  select(-`2024`) |> 
+  datatable(rownames = FALSE,
+            # extensions = "Buttons",
+            options = list(pageLength = 30,
+                           ordering=FALSE,
+                           dom='t', 
+                           # buttons = c('copy', 'csv', 'excel', 'pdf', 'print'),
+                           # rowGroup = list(dataSrc = 7),
+                           columnDefs = list(
+                             list(visible = FALSE, targets=8:9)
+                             # list(targets=2:9, class="dt-right")
+                           )
+            ),
+            class = "compact nowrap stripe hover"
+  ) %>% 
+  formatStyle(3:9,
+              `text-align` = "right") %>% 
+  formatCurrency(3:9,
+                 digits = 0,
+                 currency ="",
+                 interval=3,
+                 rows = 9:18,
+                 mark=",")
+
+sua_target
+```
+
+-   SUA targets: Reach 100% self sufficiency by 2030 at *63% MR* and *122.7 kg/year per capita consumption*.
+:::
+
+## Reaching Sufficiency through demand management {.tiny-text}
+
+```{r}
+#| echo: false
+
+suff_percap <-  read_csv("diffpercap.csv") |> 
+  pivot_longer(-c(mr,percap),
+               names_to = c("var","year"),
+               names_sep = '_',
+               values_to = "value") |> 
+  mutate(Yr = factor(year,levels = c(2024,2025,2026,2027,2028,2029,2030)
+  )) |> 
+  pivot_wider(names_from=var,
+              values_from=value)
+
+
+
+plot_ly(data = suff_percap |> 
+          filter(mr==0.63),
+        x=~Yr,
+        height=600,
+        width=1000) |> 
+  add_lines(y=~`Sufficiency Ratio`,
+            color = ~factor(percap)) |> 
+  layout(
+    title =  " Rice Self Sufficiency levels at different Per capita consumption",
+    yaxis = list(title = "Rice Self Sufficiency Ratios (%)"),
+    hovermode = 'x unified',
+    xaxis = list(title = "Year"),
+    legend = list(x = 0.05, y = 0.95,
+                  title = list(text = "<b>Per Capita Consumption (kg/yr)</b>"),
+                  bgcolor = 'rgba(255, 255, 255, 0.4)',
+                      orientation = "v",                     # vertical orientation (default)
+                  tracegroupgap = 2,                     # optional spacing between groups
+                  xanchor = "left",
+                  x = 1.02,
+                  y = 1,
+                  itemsizing = "constant",
+                  traceorder = "normal"),
+    margin = list(r = 80)
+    ) |> 
+    config(displayModeBar=FALSE)
+
+```
+
+## Needed government investment to provide 20 P/kg Rice in the market {.extra-tiny-text}
+
+::: tiny-text
+```{r}
+
+price_scenarios <- read.xlsx("peso20budget.xlsx",
+                             sheet=1) |> 
+  mutate_if(is.numeric,
+            round,digits=2) |> 
+  mutate_if(is.numeric,
+            format,nsmall=2)
+
+budget_scenarios <- read.xlsx("peso20budget.xlsx",
+                              sheet=2) |>
+  mutate_if(is.numeric,
+            round,digits=2) |> 
+  mutate_if(is.numeric,
+            format,nsmall=2)
+
+
+price_scenario_labels <- data.frame(Item = "Farmgate and Wholesale prices",
+                                    A=NA,
+                                    B=NA,
+                                    C=NA,
+                                    D=NA)
+
+budget_scenario_labels <- data.frame(Item = "Required budget to subsidize the following quantity scenarios",
+                                    A=NA,
+                                    B=NA,
+                                    C=NA,
+                                    D=NA)
+
+merged_x <- data.frame(
+  Item = 'Required budget to subsidize the following quantity scenarios:',
+  A = 'In Billion Pesos',
+  B = '',
+  C = '',
+  D = ''
+)
+
+combined_table <- 
+  rbind(
+  price_scenarios,
+  "",
+  merged_x,
+  budget_scenarios
+)
+
+  
+datatable(
+  combined_table,
+  rownames=FALSE,
+  container = htmltools::withTags(table(
+    class = 'display',
+    thead(
+      tr(
+        th(colspan = 1, "Farmgate and Wholesale prices"),
+        th(colspan = 4, "Price per kg")
+      )
+    )
+  )),
+    options = list(
+      paging = FALSE,
+      dom='t',
+          headerCallback = JS(
+      "function(thead, data, start, end, display) {",
+      "  // Only center the second merged header cell",
+      "  $(thead).find('th').eq(1).css({'text-align': 'center'});",
+      "}"
+    ),
+                rowCallback = JS(
+              "function(row, data, index) {",
+              "  if(data[0] === 'Required budget to subsidize the following quantity scenarios:') {",
+              "    // Style A cell",
+              "    $('td', row).eq(0).css({'font-weight':'bold'});",
+              "    // Merge A to D",
+              "    $('td', row).eq(1).attr('colspan', 4);",
+              "    $('td', row).eq(1).css({'text-align':'center', 'font-weight':'bold'});",
+              "    // Hide the other cells after merge",
+              "    $('td', row).eq(2).hide();",
+              "    $('td', row).eq(3).hide();",
+              "    $('td', row).eq(4).hide();",
+              "  } else {",
+              "    // Indent values in column A (except 'Group A')",
+              "    $('td', row).eq(0).css({'padding-left': '20px'});",
+              "  }",
+              "}"
+            )
+    )
+)
+```
+:::
+
+::: tiny-text
+-   Per Capita consumption at 122.7kg/year
+-   2025 population at 115 Million (Source: PSA)
+-   Poverty incidence at 15.5 percent (Source: PSA)
+-   Subsistence incidence at 4.3 percent (Source: PSA)
+:::
+
+## 
+
+::: thank-you
+::: {style="font-size: 2.5em; font-weight: bold; text-align: center;"}
+Thank You!!
+:::
+
+::: {style="margin-top: 1em; font-size: 1.2em; text-align: center;"}
+Questions or feedback?<br> <strong>philrice.dataanalytics\@gmail.com</strong>
+:::
+:::

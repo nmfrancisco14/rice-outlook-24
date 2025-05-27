@@ -1,0 +1,7 @@
+/.quarto/
+/_site/
+.Rproj.user
+*.html
+rice outlook.html
+/rice outlook_files
+/_freeze
